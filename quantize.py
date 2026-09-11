@@ -50,11 +50,11 @@ def preprocess_dataset(files):
     output_ds = output_ds.map(get_spectrogram_and_label_id, num_parallel_calls=tf.data.AUTOTUNE)
     return output_ds
 
-# Representative dataset generator — needed for full-INT8 quantization
+# Representative dataset generator — FIXED: more samples, shuffled for better coverage
 train_ds_raw = preprocess_dataset(train_files)
 
 def representative_data_gen():
-    for spec, _ in train_ds_raw.batch(1).take(200):  # ~200 samples is enough
+    for spec, _ in train_ds_raw.shuffle(1000, seed=42).batch(1).take(500):
         yield [spec]
 
 # ---- Load trained model ----
@@ -80,7 +80,7 @@ converter = tf.lite.TFLiteConverter.from_keras_model(model)
 converter.optimizations = [tf.lite.Optimize.DEFAULT]
 converter.representative_dataset = representative_data_gen
 converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-converter.inference_input_type = tf.float32   # keep input float32 for easier feeding
+converter.inference_input_type = tf.float32
 converter.inference_output_type = tf.float32
 tflite_full_int8_model = converter.convert()
 with open('model_full_int8.tflite', 'wb') as f:
